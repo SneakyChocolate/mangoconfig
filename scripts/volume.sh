@@ -1,75 +1,27 @@
 #!/usr/bin/bash
 
-# Changes de volume of the default sink
-# Warning: This script offers no cap for volume, 
-# I'd advice to not go above 150% (which is the standard cap).
-# You can call this script like this:
-# volume.sh [up|down|mute]
+# Changes the volume of the default sink/source using wpctl (WirePlumber).
+# Usage: volume.sh [up|down|mute|micmute]
 
-function get_volume {
-	pactl get-sink-volume @DEFAULT_SINK@ | awk '{printf $5}' | cut -d '%' -f 1
-}
-
-function is_mute {
-	pactl get-sink-mute @DEFAULT_SINK@
-}
-
-function send_notification {
-
-    overvolume=`get_volume`
-    [[ $overvolume -gt 100 ]] && volume=100 || volume=$overvolume
-    #Set correct icon
-    if [[ $volume -eq 0 ]]
-        then
-            icon_name="${HOME}/.config/rice_assets/Icons/nov.png"
-        elif [[ $volume -lt 35 ]] 
-        then
-            icon_name="${HOME}/.config/rice_assets/Icons/vlow.png"
-        elif [[ $volume -lt 70 ]]
-        then 
-            icon_name="${HOME}/.config/rice_assets/Icons/vmid.png"
-        elif [[ $volume -lt 100 ]]
-        then 
-            icon_name="${HOME}/.config/rice_assets/Icons/vhigh.png"
-        else
-            icon_name="${HOME}/.config/rice_assets/Icons/vthigh.png"
-    fi;
-    #bn=$(( (volume + 5) / 5 ))
-                                                                                                                                                                    
-    #bar=$(seq -s "" $bn | sed 's/[0-9]//g')          
-                                                                                                         
-    # Send the notification                                                      
-    dunstify "Volume: $overvolume%" -h int:value:$volume -i /usr/share/icons/Adwaita/96x96/status/audio-volume-medium-symbolic.symbolic.png  -t 1000 --replace=555 -u normal
-}
+SINK="@DEFAULT_AUDIO_SINK@"
+SOURCE="@DEFAULT_AUDIO_SOURCE@"
 
 case $1 in
     up)
-		swayosd-client --output-volume 5
-	    # # Set the volume on (if it was muted)
-	    # pactl set-sink-mute @DEFAULT_SINK@ 0 > /dev/null
-	    # # Up the volume (+ 5%)
-    	# curvol=`get_volume`
-    	# rem=$(( (curvol + 5) % 5 ))
-    	# inc="+$(( 5 - rem ))%"
-    	# pactl set-sink-volume @DEFAULT_SINK@ $inc > /dev/null
-	    # send_notification
-	;;
+        # "-l 1.0" caps the volume at 100%, same as the niri config
+        wpctl set-volume "$SINK" 0.01+ -l 1.0
+        ;;
     down)
-		swayosd-client --output-volume -5
-	    # pactl set-sink-mute @DEFAULT_SINK@ 0 > /dev/null
-	    # curvol=`get_volume`
-    	# rem=$(( (curvol - 5) % 5 ))
-    	# inc="-$(( 5 + rem ))%"
-	    # pactl set-sink-volume @DEFAULT_SINK@ $inc > /dev/null
-	    # send_notification
-	;;
+        wpctl set-volume "$SINK" 0.01-
+        ;;
     mute)
-    	# Toggle mute
-	    pactl set-sink-mute @DEFAULT_SINK@ toggle > /dev/null
-	    if [[ `is_mute` == "Mute: yes" ]] ; then
-    		dunstify -i "${HOME}/.config/rice_assets/Icons/mute.png" --replace=555 -u normal "Volume: Mute" -t 1000 -u critical
-	    else
-	    	send_notification
-	    fi
-	;;
+        wpctl set-mute "$SINK" toggle
+        ;;
+    micmute)
+        wpctl set-mute "$SOURCE" toggle
+        ;;
+    *)
+        echo "usage: volume.sh [up|down|mute|micmute]" >&2
+        exit 1
+        ;;
 esac
